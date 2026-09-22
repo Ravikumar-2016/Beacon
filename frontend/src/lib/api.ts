@@ -2,8 +2,13 @@ import type { Job } from "./types";
 
 export class ApiError extends Error {}
 
+// In dev, Vite proxies /api to localhost:8000 (see vite.config.ts), so this
+// stays empty. In production (e.g. Vercel), set VITE_API_BASE_URL to the
+// deployed backend's origin, e.g. https://beacon-backend.onrender.com
+const API_BASE = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? "";
+
 export async function createAudit(url: string): Promise<{ id: string }> {
-  const res = await fetch("/api/audits", {
+  const res = await fetch(`${API_BASE}/api/audits`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ url }),
@@ -16,7 +21,7 @@ export async function createAudit(url: string): Promise<{ id: string }> {
 }
 
 export async function getAudit(id: string): Promise<Job> {
-  const res = await fetch(`/api/audits/${id}`);
+  const res = await fetch(`${API_BASE}/api/audits/${id}`);
   if (!res.ok) {
     throw new ApiError(`Could not fetch audit status (${res.status})`);
   }
