@@ -1,0 +1,33 @@
+{
+  "site": "example.com",
+  "audited_at": "2026-09-06T04:59:06+00:00",
+  "summary": {
+    "total_findings": 1,
+    "critical": 0,
+    "high": 0,
+    "medium": 1
+  },
+  "findings": [
+    {
+      "id": "F-001",
+      "title": "1 important page(s) are dead ends",
+      "severity": "medium",
+      "evidence": "1 page(s) have no CTA and no other internal links to continue to:\n- `https://example.com` (homepage)",
+      "suggested_action": {
+        "summary": "Add at least one link (related content, footer, or CTA) so visitors have a next step.",
+        "priority": "medium"
+      }
+    }
+  ],
+  "proactive_suggestions": [
+    {
+      "title": "No sitemap was found",
+      "evidence": "No `Sitemap:` directive was found in robots.txt, and no sitemap was found at the default /sitemap.xml location.",
+      "suggested_action": {
+        "summary": "Add a sitemap.xml (and reference it from robots.txt) so crawlers can discover your site's pages systematically rather than relying only on following links.",
+        "priority": "low"
+      },
+      "id": "P-001"
+    }
+  ]
+}
