@@ -1,83 +1,115 @@
 # Beacon — AI Readiness Audit
 
-A web frontend for the `brand-ai-readiness-audit` engine. Enter a URL, Beacon
-crawls it and reports on AI discoverability and on-site engagement with a
-prioritized, evidence-backed fix list.
+Beacon audits any public website for **AI discoverability** (can AI
+assistants find, access, and confidently use its content?) and **on-site
+engagement** (can a visitor who lands there orient, navigate, and take a
+useful next action?). Give it a URL and it hands back a structured,
+evidence-backed report: findings ranked by severity, each with the evidence
+behind it and a concrete suggested fix.
+
+It's a web frontend on top of the [`brand-ai-readiness-audit`](brand-ai-readiness-audit/)
+engine — a deterministic, read-only audit tool (see that folder's own
+[README](brand-ai-readiness-audit/README.md) for how the checks themselves
+work).
 
 ```
 BrandAiReadinessAudit/
-├── brand-ai-readiness-audit/   # the audit engine (skills marketplace) — unchanged
+├── brand-ai-readiness-audit/   # the audit engine (skills marketplace) — read-only, unmodified
 ├── backend/                    # FastAPI wrapper exposing the engine over HTTP
 └── frontend/                   # React + Tailwind UI
 ```
 
-## Run it
+## Prerequisites
 
-**Backend** (from the repo root, using the existing `.venv`):
+- **Python 3.12+**
+- **Node.js 20+** and npm
+
+## Setup
+
+Clone the repo:
 
 ```bash
-.venv/Scripts/python.exe -m pip install -r brand-ai-readiness-audit/requirements.txt fastapi "uvicorn[standard]"
-.venv/Scripts/python.exe -m playwright install chromium
-.venv/Scripts/python.exe -m uvicorn main:app --app-dir backend --port 8000
+git clone https://github.com/Ravikumar-2016/Beacon.git
+cd Beacon
 ```
 
-**Frontend** (in a second terminal):
+### Backend
+
+```bash
+python -m venv .venv
+
+# Windows
+.venv\Scripts\activate
+# macOS / Linux
+source .venv/bin/activate
+
+pip install -r backend/requirements.txt
+python -m playwright install chromium
+```
+
+### Frontend
 
 ```bash
 cd frontend
 npm install
+cd ..
+```
+
+## Run it
+
+Two terminals, both from the repo root.
+
+**Terminal 1 — backend:**
+
+```bash
+python -m uvicorn main:app --app-dir backend --port 8000
+```
+
+**Terminal 2 — frontend:**
+
+```bash
+cd frontend
 npm run dev
 ```
 
-Open the printed `http://localhost:5173` URL. The Vite dev server proxies
-`/api/*` to the backend on port 8000 (see `frontend/vite.config.ts`).
+Open **http://localhost:5173**, enter a URL, and run an audit. The Vite dev
+server proxies `/api/*` to the backend on port 8000 (see
+`frontend/vite.config.ts`) — no extra configuration needed.
+
+A full audit crawls up to 15 pages and can take a few minutes; the UI shows
+live progress while it runs.
 
 ## API
 
-- `POST /api/audits {"url": "https://example.com"}` → `{ id, status }`
-- `GET /api/audits/{id}` → job status, and `report` once `status` is `"done"`
+The backend exposes two endpoints (see `backend/main.py`):
 
-Audits run as background jobs (they can take a few minutes), so the frontend
-polls for status rather than holding one long request open.
+- `POST /api/audits` — body `{"url": "https://example.com"}` → `{ id, status }`.
+  Starts an audit as a background job.
+- `GET /api/audits/{id}` — returns the job's `status`
+  (`queued` / `running` / `done` / `error`), and `report` once done.
 
-## Deploying
+Audits run as background jobs rather than a single long request, since a
+full crawl can take a few minutes.
 
-Split the deploy: **frontend → Vercel**, **backend → Render**. Vercel's
-serverless functions can't run this backend — audits take up to ~5 minutes
-(past any serverless timeout) and need a real Chromium browser plus
-in-memory job state, none of which fit a stateless function. Render runs it
-as a normal always-on Docker container instead.
+## About the audit engine
 
-### 1. Push to GitHub
+The engine underneath (`brand-ai-readiness-audit/`) is:
 
-Render deploys from a connected Git repo.
+- **Read-only / recommendation-only** — never modifies the target site, no
+  form submissions, no logins.
+- **Respects `robots.txt`** — won't crawl disallowed paths.
+- **Bounded** — max 15 pages, depth 3, 3 rendered pages, no rate abuse.
 
-```bash
-git add -A
-git commit -m "Prepare for deployment"
-git push -u origin main
-```
+See its own [README](brand-ai-readiness-audit/README.md) for the full
+architecture (four cooperating skills: orchestrator, crawl/render,
+freshness/corroboration, engagement) and the report schema.
 
-### 2. Backend on Render
+## Troubleshooting
 
-1. [render.com](https://render.com) → **New +** → **Blueprint** → connect
-   this repo. Render reads [`render.yaml`](render.yaml) and builds
-   [`backend/Dockerfile`](backend/Dockerfile) (which installs Chromium via
-   `playwright install --with-deps chromium`).
-2. Once deployed, copy the service URL, e.g. `https://beacon-backend.onrender.com`.
-3. The free plan spins down after 15 minutes idle — the first request after
-   that takes ~30–60s to cold-start. Upgrade the plan if that's not
-   acceptable, or if audits are hitting the free tier's 512MB RAM limit.
-
-### 3. Frontend on Vercel
-
-1. [vercel.com](https://vercel.com) → **Add New** → **Project** → import
-   this repo, with **Root Directory** set to `frontend`. Vercel
-   auto-detects Vite (build command `npm run build`, output `dist`).
-2. Add an environment variable: `VITE_API_BASE_URL` = your Render backend
-   URL from step 2 (see `frontend/.env.example`).
-3. Deploy. Your site is live at the Vercel-assigned URL (or a custom domain
-   you attach in the project's Domains settings).
-
-Or from the CLI, run `npx vercel` inside `frontend/` and follow the prompts
-(it asks for env vars during setup, or add them after via `vercel env add`).
+- **`playwright install chromium` fails or hangs** — make sure the venv is
+  activated first; the browser installs into that environment.
+- **Frontend can't reach the backend** — confirm the backend is running on
+  port 8000 before starting `npm run dev`, and that nothing else is bound
+  to either port 5173 or 8000.
+- **Audit takes a long time on a large site** — expected; it's bounded but
+  a full crawl + render pass can take a few minutes.

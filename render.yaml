@@ -1,8 +1,0 @@
-services:
-  - type: web
-    name: beacon-backend
-    runtime: docker
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: .
-    plan: free
-    healthCheckPath: /api/health
